@@ -17,12 +17,12 @@ import (
 
 const nMatches int = 30
 const nWeight int = 2
-const scoreCutoff float64 = 100
+const scoreCutoff float32 = 100
 
-var mysqlHostPort string = os.Getenv("NS2SKILL_MYSQL_HOST")
-var mysqlUser string = os.Getenv("NS2SKILL_MYSQL_USER")
-var mysqlPass string = os.Getenv("NS2SKILL_MYSQL_PASS")
-var mysqlDb string = os.Getenv("NS2SKILL_MYSQL_DB")
+var mysqlHostPort string = os.Getenv("MYSQL_HOST")
+var mysqlUser string = os.Getenv("MYSQL_USER")
+var mysqlPass string = os.Getenv("MYSQL_PASS")
+var mysqlDb string = os.Getenv("MYSQL_DB")
 
 var players map[int]*Player
 
@@ -41,14 +41,14 @@ type Player struct {
 	hiveskill         int
 	nMarine           int
 	nAlien            int
-	weightMarine      float64
-	weightAlien       float64
-	repeatScoreMarine float64
-	repeatScoreAlien  float64
-	winrateMarine     float64
-	winrateAlien      float64
-	multiplierMarine  float64
-	multiplierAlien   float64
+	weightMarine      float32
+	weightAlien       float32
+	repeatScoreMarine float32
+	repeatScoreAlien  float32
+	winrateMarine     float32
+	winrateAlien      float32
+	multiplierMarine  float32
+	multiplierAlien   float32
 	hiveskillMarine   int
 	hiveskillAlien    int
 }
@@ -56,10 +56,10 @@ type Player struct {
 type TeamComb struct {
 	marines     []*Player
 	aliens      []*Player
-	diffMean    float64
-	diffStd     float64
-	score       float64
-	repeatScore float64
+	diffMean    float32
+	diffStd     float32
+	score       float32
+	repeatScore float32
 }
 
 type ShuffleResponse struct {
@@ -108,20 +108,20 @@ func combs(n []int, emit func([]int, []int)) {
 	gen(n, make([]int, sum), 0)
 }
 
-func mean(vals ...int) float64 {
+func mean(vals ...int) float32 {
 	var sum int
 	for _, v := range vals {
 		sum += v
 	}
-	avg := float64(sum / len(vals))
+	avg := float32(sum / len(vals))
 	return avg
 }
 
-func stdev(vals ...int) float64 {
-	var n = float64(len(vals))
-	var ss float64
+func stdev(vals ...int) float32 {
+	var n = float32(len(vals))
+	var ss float32
 	for _, v := range vals {
-		ss += math.Pow(float64(v)-mean(vals...), 2)
+		ss += math.Pow(float32(v)-mean(vals...), 2)
 	}
 	return math.Pow(ss/n, 0.5)
 }
@@ -176,7 +176,7 @@ func update() {
 
 		for ns2id, rounds := range *r {
 			var wins int
-			var winrate float64
+			var winrate float32
 			var n int = nMatches
 			var nRounds int = len(rounds)
 			var end int
@@ -190,7 +190,7 @@ func update() {
 			for i := nRounds - 1; i >= end; i-- {
 				wins += rounds[i].win
 			}
-			winrate = float64(wins) / float64(n)
+			winrate = float32(wins) / float32(n)
 
 			switch team {
 			case 1:
@@ -211,8 +211,8 @@ func update() {
 						alienRounds += 1
 					}
 				}
-				players[ns2id].repeatScoreMarine = float64(marineRounds) / float64(nWeight)
-				players[ns2id].repeatScoreAlien = float64(alienRounds) / float64(nWeight)
+				players[ns2id].repeatScoreMarine = float32(marineRounds) / float32(nWeight)
+				players[ns2id].repeatScoreAlien = float32(alienRounds) / float32(nWeight)
 			} else {
 				players[ns2id].repeatScoreMarine = 0
 				players[ns2id].repeatScoreAlien = 0
@@ -220,12 +220,12 @@ func update() {
 		}
 
 		for _, p := range players {
-			p.weightMarine = math.Pow(float64(p.nMarine)/float64(nMatches), 4)
-			p.weightAlien = math.Pow(float64(p.nAlien)/float64(nMatches), 4)
+			p.weightMarine = math.Pow(float32(p.nMarine)/float32(nMatches), 4)
+			p.weightAlien = math.Pow(float32(p.nAlien)/float32(nMatches), 4)
 			p.multiplierMarine = p.winrateMarine*2.0*p.weightMarine + (1.0 - p.weightMarine)
 			p.multiplierAlien = p.winrateAlien*2.0*p.weightAlien + (1.0 - p.weightAlien)
-			p.hiveskillMarine = int(float64(p.hiveskill) * p.multiplierMarine)
-			p.hiveskillAlien = int(float64(p.hiveskill) * p.multiplierAlien)
+			p.hiveskillMarine = int(float32(p.hiveskill) * p.multiplierMarine)
+			p.hiveskillAlien = int(float32(p.hiveskill) * p.multiplierAlien)
 		}
 	}
 
@@ -245,8 +245,8 @@ func shuffle(shuffle_ns2ids []int, shuffle_hiveskills []int) []byte {
 			players[ns2id] = &Player{ns2id: ns2id, hiveskill: shuffle_hiveskills[i], multiplierMarine: 1, multiplierAlien: 1, weightMarine: 0, weightAlien: 0}
 		} else {
 			player.hiveskill = shuffle_hiveskills[i]
-			player.hiveskillMarine = int(float64(shuffle_hiveskills[i]) * player.multiplierMarine)
-			player.hiveskillAlien = int(float64(shuffle_hiveskills[i]) * player.multiplierAlien)
+			player.hiveskillMarine = int(float32(shuffle_hiveskills[i]) * player.multiplierMarine)
+			player.hiveskillAlien = int(float32(shuffle_hiveskills[i]) * player.multiplierAlien)
 		}
 	}
 
@@ -257,14 +257,14 @@ func shuffle(shuffle_ns2ids []int, shuffle_hiveskills []int) []byte {
 	combs([]int{nTeamPlayers, nTeamPlayers}, func(t1 []int, t2 []int) {
 		var marines []*Player
 		var aliens []*Player
-		var meanMarines, meanAliens, stdMarines, stdAliens float64
-		var diffMean, diffStd, score float64
-		var marineRepeatScore, alienRepeatScore, repeatScore float64
+		var meanMarines, meanAliens, stdMarines, stdAliens float32
+		var diffMean, diffStd, score float32
+		var marineRepeatScore, alienRepeatScore, repeatScore float32
 		var hiveskillsMarine, hiveskillsAlien []int
 
 		for _, i := range t1 {
 			player := players[shuffle_ns2ids[i]]
-			player.hiveskillMarine = int(float64(player.hiveskill) * player.multiplierMarine)
+			player.hiveskillMarine = int(float32(player.hiveskill) * player.multiplierMarine)
 			marines = append(marines, player)
 			var hs int = player.hiveskillMarine
 			hiveskillsMarine = append(hiveskillsMarine, hs)
@@ -272,7 +272,7 @@ func shuffle(shuffle_ns2ids []int, shuffle_hiveskills []int) []byte {
 		}
 		for _, i := range t2 {
 			player := players[shuffle_ns2ids[i]]
-			player.hiveskillAlien = int(float64(player.hiveskill) * player.multiplierAlien)
+			player.hiveskillAlien = int(float32(player.hiveskill) * player.multiplierAlien)
 			aliens = append(aliens, player)
 			var hs int = player.hiveskillAlien
 			hiveskillsAlien = append(hiveskillsAlien, hs)
@@ -363,8 +363,8 @@ func PlayerEndpoint(w http.ResponseWriter, r *http.Request) {
 	player, playerExists := players[ns2id]
 	if playerExists {
 		player.hiveskill = hs
-		player.hiveskillMarine = int(float64(hs) * player.multiplierMarine)
-		player.hiveskillAlien = int(float64(hs) * player.multiplierAlien)
+		player.hiveskillMarine = int(float32(hs) * player.multiplierMarine)
+		player.hiveskillAlien = int(float32(hs) * player.multiplierAlien)
 		playerName = player.name
 	} else {
 		player = &Player{ns2id: ns2id, hiveskill: hs, hiveskillMarine: hs, hiveskillAlien: hs}
